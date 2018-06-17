@@ -62,7 +62,7 @@ func (p *port) handleSRTP(buffer []byte) {
 	}
 	p.m.srtpContextsLock.Unlock()
 
-	if ok := srtpContext.DecryptPacket(packet); !ok {
+	if ok := srtpContext.DecryptPacket(packet, buffer); !ok {
 		fmt.Println("Failed to decrypt packet")
 		return
 	}
