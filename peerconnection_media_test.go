@@ -5,9 +5,9 @@ package webrtc
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"math/rand"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +15,13 @@ import (
 	"github.com/pions/transport/test"
 	"github.com/pions/webrtc/pkg/media"
 )
+
+/*
+Integration test for bi-directional peers
+
+This asserts we can send RTP and RTCP both ways, and blocks until
+each side gets something (and asserts payload contents)
+*/
 
 func TestPeerConnection_Media_Sample(t *testing.T) {
 	api := NewAPI()
@@ -44,7 +51,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 		go func() {
 			for {
 				time.Sleep(time.Millisecond * 100)
-				if routineErr := pcAnswer.SendRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: track.SSRC(), MediaSSRC: track.SSRC()}); routineErr != nil {
+				if routineErr := pcAnswer.WriteRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: track.SSRC(), MediaSSRC: track.SSRC()}); routineErr != nil {
 					awaitRTCPRecieverSend <- routineErr
 					return
 				}
@@ -108,7 +115,7 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 100)
-			if routineErr := pcOffer.SendRTCP(&rtcp.PictureLossIndication{SenderSSRC: vp8Track.SSRC(), MediaSSRC: vp8Track.SSRC()}); routineErr != nil {
+			if routineErr := pcOffer.WriteRTCP(&rtcp.PictureLossIndication{SenderSSRC: vp8Track.SSRC(), MediaSSRC: vp8Track.SSRC()}); routineErr != nil {
 				awaitRTCPSenderSend <- routineErr
 			}
 
@@ -177,12 +184,9 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	pcOffer, err := NewPeerConnection(Configuration{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pcAnswer, err := NewPeerConnection(Configuration{})
+	api := NewAPI()
+	api.mediaEngine.RegisterDefaultCodecs()
+	pcOffer, pcAnswer, err := api.newPair()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,62 +265,161 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	onTrackFiredLock.Unlock()
 }
 
-func TestPeerConnection_Media_Sender_Transports_OnSelectedCandidatePairChange(t *testing.T) {
-	iceComplete := make(chan bool)
+/*
+Integration test for behavior around media and disconnected peers
 
-	api := NewAPI()
+* Sending RTP and RTCP to a disconnected Peer shouldn't return an error
+*/
+func TestPeerConnection_Media_Disconnected(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
+	report := test.CheckRoutines(t)
+	defer report()
+
+	s := SettingEngine{}
+	s.SetConnectionTimeout(time.Duration(1)*time.Second, time.Duration(250)*time.Millisecond)
+
+	api := NewAPI(WithSettingEngine(s))
+	api.mediaEngine.RegisterDefaultCodecs()
+
+	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vp8Sender, err := pcOffer.AddTrack(vp8Track)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	haveDisconnected := make(chan error)
+	pcOffer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
+		if iceState == ICEConnectionStateDisconnected {
+			close(haveDisconnected)
+		} else if iceState == ICEConnectionStateConnected {
+			// Assert that DTLS is done by pull remote certificate, don't tear down the PC early
+			for {
+				if len(vp8Sender.Transport().GetRemoteCertificate()) != 0 {
+					pcAnswer.sctpTransport.lock.RLock()
+					haveAssocation := pcAnswer.sctpTransport.association != nil
+					pcAnswer.sctpTransport.lock.RUnlock()
+
+					if haveAssocation {
+						break
+					}
+				}
+
+				time.Sleep(time.Second)
+			}
+
+			if pcCloseErr := pcAnswer.Close(); pcCloseErr != nil {
+				haveDisconnected <- pcCloseErr
+			}
+		}
+	})
+
+	err = signalPair(pcOffer, pcAnswer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err, ok := <-haveDisconnected
+	if ok {
+		t.Fatal(err)
+	}
+	for i := 0; i <= 5; i++ {
+		if rtpErr := vp8Track.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); rtpErr != nil {
+			t.Fatal(rtpErr)
+		} else if rtcpErr := pcOffer.WriteRTCP(&rtcp.PictureLossIndication{MediaSSRC: 0}); rtcpErr != nil {
+			t.Fatal(rtcpErr)
+		}
+	}
+
+	err = pcOffer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+/*
+Integration test for behavior around media and closing
+
+* Writing and Reading from tracks should return io.EOF when the PeerConnection is closed
+*/
+func TestPeerConnection_Media_Closed(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
 	pcOffer, pcAnswer, err := api.newPair()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	opusTrack, err := pcOffer.NewTrack(DefaultPayloadTypeOpus, rand.Uint32(), "audio", "pion1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	vp8Track, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
+	vp8Writer, err := pcOffer.NewTrack(DefaultPayloadTypeVP8, rand.Uint32(), "video", "pion2")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err = pcOffer.AddTrack(opusTrack); err != nil {
-		t.Fatal(err)
-	} else if _, err = pcAnswer.AddTrack(vp8Track); err != nil {
+	if _, err = pcOffer.AddTrack(vp8Writer); err != nil {
 		t.Fatal(err)
 	}
 
-	pcAnswer.OnICEConnectionStateChange(func(iceState ICEConnectionState) {
-		if iceState == ICEConnectionStateConnected {
-			time.Sleep(3 * time.Second) // TODO PeerConnection.Close() doesn't block for all subsystems
-			close(iceComplete)
-		}
+	answerChan := make(chan *Track)
+	pcAnswer.OnTrack(func(t *Track, r *RTPReceiver) {
+		answerChan <- t
 	})
-
-	senderCalledCandidateChange := int32(0)
-	for _, sender := range pcOffer.GetSenders() {
-		dtlsTransport := sender.Transport()
-		if dtlsTransport == nil {
-			continue
-		}
-		if iceTransport := dtlsTransport.ICETransport(); iceTransport != nil {
-			iceTransport.OnSelectedCandidatePairChange(func(pair *ICECandidatePair) {
-				atomic.StoreInt32(&senderCalledCandidateChange, 1)
-			})
-		}
-	}
 
 	err = signalPair(pcOffer, pcAnswer)
 	if err != nil {
 		t.Fatal(err)
 	}
-	<-iceComplete
 
-	if atomic.LoadInt32(&senderCalledCandidateChange) == 0 {
-		t.Fatalf("Sender ICETransport OnSelectedCandidateChange was never called")
+	vp8Reader := func() *Track {
+		for {
+			if err = vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(time.Millisecond * 25)
+
+			select {
+			case t := <-answerChan:
+				return t
+			default:
+				continue
+			}
+		}
+	}()
+
+	closeChan := make(chan error)
+	go func() {
+		time.Sleep(time.Second)
+		closeChan <- pcAnswer.Close()
+	}()
+	if _, err = vp8Reader.Read(make([]byte, 1)); err != io.EOF {
+		t.Fatal("Reading from closed Track did not return io.EOF")
+	} else if err = <-closeChan; err != nil {
+		t.Fatal(err)
+	}
+
+	if err = pcOffer.Close(); err != nil {
+		t.Fatal(err)
+	} else if err = vp8Writer.WriteSample(media.Sample{Data: []byte{0x00}, Samples: 1}); err != io.ErrClosedPipe {
+		t.Fatal("Write to Track with no RTPSenders did not return io.ErrClosedPipe")
+	}
+
+	if err = pcAnswer.WriteRTCP(&rtcp.RapidResynchronizationRequest{SenderSSRC: 0, MediaSSRC: 0}); err != io.ErrClosedPipe {
+		t.Fatal("WriteRTCP to closed PeerConnection did not return io.ErrClosedPipe")
 	}
 
 	err = pcOffer.Close()

@@ -26,7 +26,7 @@ func saveToDisk(i media.Writer, track *webrtc.Track) {
 		if err != nil {
 			panic(err)
 		}
-		if err := i.AddPacket(rtpPacket); err != nil {
+		if err := i.WriteRTP(rtpPacket); err != nil {
 			panic(err)
 		}
 	}
@@ -78,7 +78,7 @@ func main() {
 		go func() {
 			ticker := time.NewTicker(time.Second * 3)
 			for range ticker.C {
-				errSend := peerConnection.SendRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC()})
+				errSend := peerConnection.WriteRTCP(&rtcp.PictureLossIndication{MediaSSRC: track.SSRC()})
 				if errSend != nil {
 					fmt.Println(errSend)
 				}

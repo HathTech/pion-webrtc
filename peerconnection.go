@@ -8,6 +8,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -545,6 +546,8 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	switch {
 	case options != nil:
 		return SessionDescription{}, fmt.Errorf("TODO handle options")
+	case pc.RemoteDescription() == nil:
+		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
 	case useIdentity:
 		return SessionDescription{}, fmt.Errorf("TODO handle identity provider")
 	case pc.isClosed:
@@ -884,7 +887,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 		pc.openSRTP()
 
-		for _, tranceiver := range pc.rtpTransceivers {
+		for _, tranceiver := range pc.GetTransceivers() {
 			if tranceiver.Sender != nil {
 				err = tranceiver.Sender.Send(RTPSendParameters{
 					Encodings: RTPEncodingParameters{
@@ -1163,7 +1166,7 @@ func (pc *PeerConnection) AddTrack(track *Track) (*RTPSender, error) {
 		return nil, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 	var transceiver *RTPTransceiver
-	for _, t := range pc.rtpTransceivers {
+	for _, t := range pc.GetTransceivers() {
 		if !t.stopped &&
 			t.Sender != nil &&
 			!t.Sender.hasSent() &&
@@ -1309,9 +1312,9 @@ func (pc *PeerConnection) SetIdentityProvider(provider string) error {
 	return fmt.Errorf("TODO SetIdentityProvider")
 }
 
-// SendRTCP sends a user provided RTCP packet to the connected peer
+// WriteRTCP sends a user provided RTCP packet to the connected peer
 // If no peer is connected the packet is discarded
-func (pc *PeerConnection) SendRTCP(pkt rtcp.Packet) error {
+func (pc *PeerConnection) WriteRTCP(pkt rtcp.Packet) error {
 	raw, err := pkt.Marshal()
 	if err != nil {
 		return err
@@ -1319,16 +1322,22 @@ func (pc *PeerConnection) SendRTCP(pkt rtcp.Packet) error {
 
 	srtcpSession, err := pc.dtlsTransport.getSRTCPSession()
 	if err != nil {
-		return nil // TODO SendRTCP before would gracefully discard packets until ready
+		return nil // TODO WriteRTCP before would gracefully discard packets until ready
 	}
 
 	writeStream, err := srtcpSession.OpenWriteStream()
 	if err != nil {
-		return fmt.Errorf("SendRTCP failed to open WriteStream: %v", err)
+		return fmt.Errorf("WriteRTCP failed to open WriteStream: %v", err)
 	}
 
 	if _, err := writeStream.Write(raw); err != nil {
-		return fmt.Errorf("SendRTCP failed to write: %v", err)
+		if err == ice.ErrNoCandidatePairs {
+			return nil
+		} else if err == ice.ErrClosed {
+			return io.ErrClosedPipe
+		}
+
+		return fmt.Errorf("WriteRTCP failed to write: %v", err)
 	}
 	return nil
 }
