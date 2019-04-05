@@ -129,7 +129,6 @@ class _MyHomePageState extends State<MyHomePage> {
                     keyboardType: TextInputType.text,
                     textAlign: TextAlign.center,
                     decoration: InputDecoration(
-                      //内容的内边距
                       contentPadding: EdgeInsets.all(10.0),
                       border: UnderlineInputBorder(
                           borderSide: BorderSide(color: Colors.black12)),
