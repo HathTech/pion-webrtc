@@ -7,9 +7,9 @@ import (
 	"time"
 
 	janus "github.com/notedit/janus-go"
-	"github.com/pions/webrtc"
+	"github.com/pion/webrtc"
 
-	gst "github.com/pions/webrtc/examples/internal/gstreamer-src"
+	gst "github.com/pion/webrtc/examples/internal/gstreamer-src"
 )
 
 func watchHandle(handle *janus.Handle) {
@@ -146,8 +146,8 @@ func main() {
 		}
 
 		// Start pushing buffers on these tracks
-		gst.CreatePipeline(webrtc.Opus, opusTrack, "audiotestsrc").Start()
-		gst.CreatePipeline(webrtc.VP8, vp8Track, "videotestsrc").Start()
+		gst.CreatePipeline(webrtc.Opus, []*webrtc.Track{opusTrack}, "audiotestsrc").Start()
+		gst.CreatePipeline(webrtc.VP8, []*webrtc.Track{vp8Track}, "videotestsrc").Start()
 	}
 
 	select {}

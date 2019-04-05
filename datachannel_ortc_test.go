@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pions/transport/test"
-	"github.com/pions/webrtc/internal/util"
+	"github.com/pion/transport/test"
+	"github.com/pion/webrtc/internal/util"
 )
 
 func TestDataChannel_ORTCE2E(t *testing.T) {
@@ -133,7 +133,10 @@ func (s *testORTCStack) getSignal() (*testORTCSignal, error) {
 		return nil, err
 	}
 
-	dtlsParams := s.dtls.GetLocalParameters()
+	dtlsParams, err := s.dtls.GetLocalParameters()
+	if err != nil {
+		return nil, err
+	}
 
 	sctpCapabilities := s.sctp.GetCapabilities()
 

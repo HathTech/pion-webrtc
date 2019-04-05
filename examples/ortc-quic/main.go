@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pions/quic"
-	"github.com/pions/webrtc"
+	"github.com/pion/quic"
+	"github.com/pion/webrtc"
 
-	"github.com/pions/webrtc/examples/internal/signal"
+	"github.com/pion/webrtc/examples/internal/signal"
 )
 
 const messageSize = 15
@@ -73,7 +73,10 @@ func main() {
 		panic(err)
 	}
 
-	quicParams := qt.GetLocalParameters()
+	quicParams, err := qt.GetLocalParameters()
+	if err != nil {
+		panic(err)
+	}
 
 	s := Signal{
 		ICECandidates:  iceCandidates,

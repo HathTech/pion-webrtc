@@ -4,12 +4,20 @@ import (
 	"net"
 	"sync"
 
-	"github.com/pions/logging"
-	"github.com/pions/transport/packetio"
+	"github.com/pion/logging"
+	"github.com/pion/transport/packetio"
 )
 
 // The maximum amount of data that can be buffered before returning errors.
 const maxBufferSize = 1000 * 1000 // 1MB
+
+// Config collects the arguments to mux.Mux construction into
+// a single structure
+type Config struct {
+	Conn          net.Conn
+	BufferSize    int
+	LoggerFactory logging.LoggerFactory
+}
 
 // Mux allows multiplexing
 type Mux struct {
@@ -19,17 +27,17 @@ type Mux struct {
 	bufferSize int
 	closedCh   chan struct{}
 
-	log *logging.LeveledLogger
+	log logging.LeveledLogger
 }
 
 // NewMux creates a new Mux
-func NewMux(conn net.Conn, bufferSize int) *Mux {
+func NewMux(config Config) *Mux {
 	m := &Mux{
-		nextConn:   conn,
+		nextConn:   config.Conn,
 		endpoints:  make(map[*Endpoint]MatchFunc),
-		bufferSize: bufferSize,
+		bufferSize: config.BufferSize,
 		closedCh:   make(chan struct{}),
-		log:        logging.NewScopedLogger("mux"),
+		log:        config.LoggerFactory.NewLogger("mux"),
 	}
 
 	go m.readLoop()

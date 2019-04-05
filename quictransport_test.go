@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pions/quic"
-	"github.com/pions/transport/test"
-	"github.com/pions/webrtc/internal/util"
+	"github.com/pion/quic"
+	"github.com/pion/transport/test"
+	"github.com/pion/webrtc/internal/util"
 )
 
 func TestQUICTransport_E2E(t *testing.T) {
@@ -126,7 +126,10 @@ func (s *testQuicStack) getSignal() (*testQuicSignal, error) {
 		return nil, err
 	}
 
-	quicParams := s.quic.GetLocalParameters()
+	quicParams, err := s.quic.GetLocalParameters()
+	if err != nil {
+		return nil, err
+	}
 
 	return &testQuicSignal{
 		ICECandidates:  iceCandidates,

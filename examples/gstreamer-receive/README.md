@@ -10,11 +10,11 @@ This example requires you have GStreamer installed, these are the supported plat
 `pacman -S mingw-w64-x86_64-gstreamer mingw-w64-x86_64-gst-libav mingw-w64-x86_64-gst-plugins-good mingw-w64-x86_64-gst-plugins-bad mingw-w64-x86_64-gst-plugins-ugly`
 ### Download gstreamer-receive
 ```
-go get github.com/pions/webrtc/examples/gstreamer-receive
+go get github.com/pion/webrtc/examples/gstreamer-receive
 ```
 
 ### Open gstreamer-receive example page
-[jsfiddle.net](https://jsfiddle.net/pdm7bqfr/) you should see your Webcam, two text-areas and a 'Start Session' button
+[jsfiddle.net](https://jsfiddle.net/8t2g5Lar/) you should see your Webcam, two text-areas and a 'Start Session' button
 
 ### Run gstreamer-receive with your browsers SessionDescription as stdin
 In the jsfiddle the top textarea is your browser, copy that and:

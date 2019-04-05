@@ -7,9 +7,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/pions/datachannel"
-	"github.com/pions/logging"
-	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pion/datachannel"
+	"github.com/pion/logging"
+	"github.com/pion/webrtc/pkg/rtcerr"
 )
 
 const dataChannelBufferSize = 16384 // Lowest common denominator among browsers
@@ -51,14 +51,14 @@ type DataChannel struct {
 
 	// A reference to the associated api object used by this datachannel
 	api *API
-	log *logging.LeveledLogger
+	log logging.LeveledLogger
 }
 
 // NewDataChannel creates a new DataChannel.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewDataChannel(transport *SCTPTransport, params *DataChannelParameters) (*DataChannel, error) {
-	d, err := api.newDataChannel(params, logging.NewScopedLogger("ortc"))
+	d, err := api.newDataChannel(params, api.settingEngine.LoggerFactory.NewLogger("ortc"))
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (api *API) NewDataChannel(transport *SCTPTransport, params *DataChannelPara
 
 // newDataChannel is an internal constructor for the data channel used to
 // create the DataChannel object before the networking is set up.
-func (api *API) newDataChannel(params *DataChannelParameters, log *logging.LeveledLogger) (*DataChannel, error) {
+func (api *API) newDataChannel(params *DataChannelParameters, log logging.LeveledLogger) (*DataChannel, error) {
 	// https://w3c.github.io/webrtc-pc/#peer-to-peer-data-api (Step #5)
 	if len(params.Label) > 65535 {
 		return nil, &rtcerr.TypeError{Err: ErrStringSizeLimit}
@@ -270,7 +270,7 @@ func (d *DataChannel) readLoop() {
 			d.mu.Unlock()
 			if err != io.EOF {
 				// TODO: Throw OnError
-				fmt.Println("Failed to read from data channel", err)
+				d.log.Errorf("Failed to read from data channel %v", err)
 			}
 			d.onClose()
 			return
@@ -326,7 +326,7 @@ func (d *DataChannel) ensureOpen() error {
 // webrtc.DetachDataChannels(). Combining detached and normal data channels
 // is not supported.
 // Please reffer to the data-channels-detach example and the
-// pions/datachannel documentation for the correct way to handle the
+// pion/datachannel documentation for the correct way to handle the
 // resulting DataChannel object.
 func (d *DataChannel) Detach() (datachannel.ReadWriteCloser, error) {
 	d.mu.Lock()
@@ -458,7 +458,7 @@ func (d *DataChannel) BufferedAmount() uint64 {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	// TODO: wire to SCTP (pions/sctp#11)
+	// TODO: wire to SCTP (pion/sctp#11)
 	return 0
 }
 
@@ -471,7 +471,7 @@ func (d *DataChannel) BufferedAmountLowThreshold() uint64 {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	// TODO: wire to SCTP (pions/sctp#11)
+	// TODO: wire to SCTP (pion/sctp#11)
 	return d.bufferedAmountLowThreshold
 }
 
@@ -484,6 +484,6 @@ func (d *DataChannel) SetBufferedAmountLowThreshold(th uint64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// TODO: wire to SCTP (pions/sctp#11)
+	// TODO: wire to SCTP (pion/sctp#11)
 	d.bufferedAmountLowThreshold = th
 }

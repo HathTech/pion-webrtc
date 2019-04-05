@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pions/dtls"
-	"github.com/pions/srtp"
-	"github.com/pions/webrtc/internal/mux"
-	"github.com/pions/webrtc/internal/util"
-	"github.com/pions/webrtc/pkg/rtcerr"
+	"github.com/pion/dtls"
+	"github.com/pion/srtp"
+	"github.com/pion/webrtc/internal/mux"
+	"github.com/pion/webrtc/internal/util"
+	"github.com/pion/webrtc/pkg/rtcerr"
 )
 
 // DTLSTransport allows an application access to information about the DTLS
@@ -82,18 +82,22 @@ func (t *DTLSTransport) ICETransport() *ICETransport {
 }
 
 // GetLocalParameters returns the DTLS parameters of the local DTLSTransport upon construction.
-func (t *DTLSTransport) GetLocalParameters() DTLSParameters {
+func (t *DTLSTransport) GetLocalParameters() (DTLSParameters, error) {
 	fingerprints := []DTLSFingerprint{}
 
 	for _, c := range t.certificates {
-		prints := c.GetFingerprints() // TODO: Should be only one?
+		prints, err := c.GetFingerprints() // TODO: Should be only one?
+		if err != nil {
+			return DTLSParameters{}, err
+		}
+
 		fingerprints = append(fingerprints, prints...)
 	}
 
 	return DTLSParameters{
 		Role:         DTLSRoleAuto, // always returns the default role
 		Fingerprints: fingerprints,
-	}
+	}, nil
 }
 
 // GetRemoteCertificate returns the certificate chain in use by the remote side

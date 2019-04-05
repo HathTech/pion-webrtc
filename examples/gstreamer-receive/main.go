@@ -5,11 +5,11 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/pions/rtcp"
-	"github.com/pions/webrtc"
+	"github.com/pion/rtcp"
+	"github.com/pion/webrtc"
 
-	gst "github.com/pions/webrtc/examples/internal/gstreamer-sink"
-	"github.com/pions/webrtc/examples/internal/signal"
+	gst "github.com/pion/webrtc/examples/internal/gstreamer-sink"
+	"github.com/pion/webrtc/examples/internal/signal"
 )
 
 // gstreamerReceiveMain is launched in a goroutine because the main thread is needed
@@ -29,6 +29,15 @@ func gstreamerReceiveMain() {
 	// Create a new RTCPeerConnection
 	peerConnection, err := webrtc.NewPeerConnection(config)
 	if err != nil {
+		panic(err)
+	}
+
+	// Allow us to receive 1 audio track, and 2 video tracks
+	if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
+		panic(err)
+	} else if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
+		panic(err)
+	} else if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
 		panic(err)
 	}
 

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/pions/webrtc"
+	"github.com/pion/webrtc"
 
-	gst "github.com/pions/webrtc/examples/internal/gstreamer-src"
-	"github.com/pions/webrtc/examples/internal/signal"
+	gst "github.com/pion/webrtc/examples/internal/gstreamer-src"
+	"github.com/pion/webrtc/examples/internal/signal"
 )
 
 func main() {
@@ -85,8 +85,8 @@ func main() {
 	}
 
 	// Start pushing buffers on these tracks
-	gst.CreatePipeline(webrtc.Opus, opusTrack, *audioSrc).Start()
-	gst.CreatePipeline(webrtc.VP8, vp8Track, *videoSrc).Start()
+	gst.CreatePipeline(webrtc.Opus, []*webrtc.Track{opusTrack}, *audioSrc).Start()
+	gst.CreatePipeline(webrtc.VP8, []*webrtc.Track{vp8Track}, *videoSrc).Start()
 
 	// Block forever
 	select {}

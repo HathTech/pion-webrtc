@@ -5,13 +5,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/pions/rtcp"
-	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/pkg/media"
-	"github.com/pions/webrtc/pkg/media/ivfwriter"
-	"github.com/pions/webrtc/pkg/media/opuswriter"
+	"github.com/pion/rtcp"
+	"github.com/pion/webrtc"
+	"github.com/pion/webrtc/pkg/media"
+	"github.com/pion/webrtc/pkg/media/ivfwriter"
+	"github.com/pion/webrtc/pkg/media/opuswriter"
 
-	"github.com/pions/webrtc/examples/internal/signal"
+	"github.com/pion/webrtc/examples/internal/signal"
 )
 
 func saveToDisk(i media.Writer, track *webrtc.Track) {
@@ -58,6 +58,13 @@ func main() {
 	// Create a new RTCPeerConnection
 	peerConnection, err := api.NewPeerConnection(config)
 	if err != nil {
+		panic(err)
+	}
+
+	// Allow us to receive 1 audio track, and 1 video track
+	if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeAudio); err != nil {
+		panic(err)
+	} else if _, err = peerConnection.AddTransceiver(webrtc.RTPCodecTypeVideo); err != nil {
 		panic(err)
 	}
 

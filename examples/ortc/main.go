@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pions/webrtc"
+	"github.com/pion/webrtc"
 
-	"github.com/pions/webrtc/examples/internal/signal"
+	"github.com/pion/webrtc/examples/internal/signal"
 )
 
 func main() {
@@ -71,7 +71,10 @@ func main() {
 		panic(err)
 	}
 
-	dtlsParams := dtls.GetLocalParameters()
+	dtlsParams, err := dtls.GetLocalParameters()
+	if err != nil {
+		panic(err)
+	}
 
 	sctpCapabilities := sctp.GetCapabilities()
 

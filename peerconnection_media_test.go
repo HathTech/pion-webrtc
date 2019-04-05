@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pions/rtcp"
-	"github.com/pions/transport/test"
-	"github.com/pions/webrtc/pkg/media"
+	"github.com/pion/rtcp"
+	"github.com/pion/transport/test"
+	"github.com/pion/webrtc/pkg/media"
 )
 
 /*
@@ -33,6 +33,11 @@ func TestPeerConnection_Media_Sample(t *testing.T) {
 
 	api.mediaEngine.RegisterDefaultCodecs()
 	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,6 +192,16 @@ func TestPeerConnection_Media_Shutdown(t *testing.T) {
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
 	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = pcOffer.AddTransceiver(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo, RtpTransceiverInit{Direction: RTPTransceiverDirectionRecvonly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,6 +377,11 @@ func TestPeerConnection_Media_Closed(t *testing.T) {
 	api := NewAPI()
 	api.mediaEngine.RegisterDefaultCodecs()
 	pcOffer, pcAnswer, err := api.newPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = pcAnswer.AddTransceiver(RTPCodecTypeVideo)
 	if err != nil {
 		t.Fatal(err)
 	}
